@@ -48,9 +48,3 @@ variable "processor_concurrency" {
   type        = number
   default     = 1
 }
-
-variable "lambda_execution_role_arn" {
-  description = "Execution role ARN for Lambda functions (provided by lab)."
-  type        = string
-  default     = "arn:aws:iam::211125751164:role/LabRole"
-}

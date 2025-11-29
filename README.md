@@ -1,26 +1,20 @@
-# CS6650 HW7 - Asynchronous Order Processing with AWS ECS and Lambda
+# CS6650 HW7 - Asynchronous Order Processing with AWS ECS
 
 ## Project Overview
-This project implements a scalable asynchronous order processing system using AWS services, comparing ECS-based and Lambda-based architectures.
+This project implements a scalable asynchronous order processing system using AWS ECS and SQS.
 
 ## Architecture
 
-### Part I & II: ECS + SQS Architecture
+### ECS + SQS Architecture
 - **Order Receiver** (ECS Fargate): Handles `/orders/sync` and `/orders/async` endpoints
 - **Order Processor** (ECS Fargate): Polls SQS and processes orders with configurable concurrency
 - **Message Flow**: API → SNS → SQS → ECS Processor
-
-### Part III: Lambda Architecture
-- **Order Receiver** (ECS Fargate): Same as Part II
-- **Order Processor** (Lambda): Triggered directly by SNS, serverless processing
-- **Message Flow**: API → SNS → Lambda
 
 ## Infrastructure Components
 - **VPC**: 10.0.0.0/16 with public (10.0.1.0/24, 10.0.2.0/24) and private subnets (10.0.10.0/24, 10.0.11.0/24)
 - **ALB**: Application Load Balancer for order receiver service
 - **ECR**: Docker image repositories for receiver and processor
 - **SNS/SQS**: Message queue infrastructure
-- **Lambda**: Serverless order processor (Part III)
 
 ## Project Structure
 ```
@@ -34,18 +28,15 @@ HW7/
 │   ├── messaging.tf      # SNS and SQS
 │   ├── lambda.tf         # Lambda function (Part III)
 │   └── security_groups.tf # Security groups
-├── src/                   # Order receiver service
-│   ├── main.go           # Go HTTP server with sync/async endpoints
-│   ├── Dockerfile        # Container image
-│   ├── locust_sync.py    # Load test for sync endpoint
-│   └── locust_async.py   # Load test for async endpoint
-├── processor/             # ECS order processor (Part II)
-│   ├── main.go           # SQS poller with goroutine workers
-│   └── Dockerfile        # Container image
-├── lambda/                # Lambda order processor (Part III)
-│   ├── main.go           # Lambda handler
-│   ├── build.ps1         # Build script for Linux binary
-│   └── go.mod            # Go dependencies
+├── src/
+│   ├── receiver/          # Order receiver service
+│   │   ├── main.go       # Go HTTP server with sync/async endpoints
+│   │   ├── Dockerfile    # Container image
+│   │   ├── locust_sync.py    # Load test for sync endpoint
+│   │   └── locust_async.py   # Load test for async endpoint
+│   └── processor/         # ECS order processor
+│       ├── main.go       # SQS poller with goroutine workers
+│       └── Dockerfile    # Container image
 └── scripts/
     └── deploy_images_and_update.ps1  # Docker build/push helper
 ```
@@ -61,7 +52,7 @@ HW7/
 ### Quick Start
 ```bash
 # 1. Build and push Docker images
-cd src
+cd src/receiver
 docker build -t ordersync-receiver:local .
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 211125751164.dkr.ecr.us-west-2.amazonaws.com
 docker tag ordersync-receiver:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-api:latest
@@ -72,16 +63,12 @@ docker build -t ordersync-processor:local .
 docker tag ordersync-processor:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-processor:latest
 docker push 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-processor:latest
 
-# 2. Build Lambda function
-cd ../lambda
-./build.ps1
-
-# 3. Deploy infrastructure
-cd ../infra
+# 2. Deploy infrastructure
+cd ../../infra
 terraform init
 terraform apply
 
-# 4. Get ALB DNS name
+# 3. Get ALB DNS name
 terraform output alb_dns_name
 ```
 
@@ -111,12 +98,12 @@ curl -X POST http://<ALB-DNS>/orders/async \
 
 ### Load Testing with Locust
 ```bash
-cd src
+cd src/receiver
 
-# Test sync endpoint (Phase 1)
+# Test sync endpoint
 locust -f locust_sync.py --host http://<ALB-DNS> --headless --users 20 --spawn-rate 1 --run-time 60s
 
-# Test async endpoint (Phase 3)
+# Test async endpoint
 locust -f locust_async.py --host http://<ALB-DNS> --headless --users 30 --spawn-rate 10 --run-time 60s
 ```
 
@@ -128,15 +115,6 @@ aws sqs get-queue-attributes \
   --queue-url https://sqs.us-west-2.amazonaws.com/211125751164/order-processing-queue \
   --attribute-names ApproximateNumberOfMessages \
   --region us-west-2
-```
-
-### Lambda Logs (Part III)
-```bash
-# View logs
-aws logs tail /aws/lambda/order-processor-lambda --follow --region us-west-2
-
-# Find cold starts
-aws logs tail /aws/lambda/order-processor-lambda --since 10m --region us-west-2 | grep "Init Duration"
 ```
 
 ### ECS Processor Logs
@@ -169,18 +147,15 @@ variable "processor_concurrency" {
 - **1 worker**: 0.33 orders/sec (1 order per 3s)
 - **20 workers**: 6.67 orders/sec
 - **100 workers**: 33.3 orders/sec
-- **Lambda (concurrent)**: Auto-scales based on load
 
-### Cost Comparison (10,000 orders/month)
+### Cost Estimate (10,000 orders/month)
 - **ECS**: ~$17/month (2 tasks always running)
-- **Lambda**: FREE (within free tier: 1M requests + 400K GB-seconds)
 
 ## Key Learnings
 1. **Sync vs Async**: Async architecture accepts orders 100x faster but requires queue management
 2. **Queue Management**: Monitor `ApproximateNumberOfMessagesVisible` to prevent backlog
 3. **Worker Scaling**: Match processing capacity to ingestion rate (need ~60 workers for 60 orders/sec at 3s processing time)
-4. **Lambda Benefits**: Zero operational overhead, pay-per-use, auto-scaling
-5. **Lambda Trade-offs**: Cold starts (~70ms overhead), no SQS retry control, 2 SNS retries then drop
+4. **Concurrency Tuning**: Adjust `PROCESSOR_CONCURRENCY` environment variable to scale processing capacity
 
 ## Cleanup
 ```bash

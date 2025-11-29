@@ -26,13 +26,3 @@ output "order_processor_repo_url" {
   description = "ECR repository URL for the order processor"
   value       = aws_ecr_repository.order_processor.repository_url
 }
-
-output "lambda_function_name" {
-  description = "Lambda function name for order processing"
-  value       = length(aws_lambda_function.order_processor_lambda) > 0 ? aws_lambda_function.order_processor_lambda[0].function_name : "N/A (lambda.zip not built)"
-}
-
-output "lambda_function_arn" {
-  description = "Lambda function ARN"
-  value       = length(aws_lambda_function.order_processor_lambda) > 0 ? aws_lambda_function.order_processor_lambda[0].arn : "N/A (lambda.zip not built)"
-}

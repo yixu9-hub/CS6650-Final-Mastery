@@ -29,10 +29,10 @@ output "order_processor_repo_url" {
 
 output "lambda_function_name" {
   description = "Lambda function name for order processing"
-  value       = aws_lambda_function.order_processor_lambda.function_name
+  value       = length(aws_lambda_function.order_processor_lambda) > 0 ? aws_lambda_function.order_processor_lambda[0].function_name : "N/A (lambda.zip not built)"
 }
 
 output "lambda_function_arn" {
   description = "Lambda function ARN"
-  value       = aws_lambda_function.order_processor_lambda.arn
+  value       = length(aws_lambda_function.order_processor_lambda) > 0 ? aws_lambda_function.order_processor_lambda[0].arn : "N/A (lambda.zip not built)"
 }

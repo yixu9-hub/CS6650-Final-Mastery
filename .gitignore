@@ -4,8 +4,8 @@
 *.so
 *.dylib
 bootstrap
-receiver
-processor
+/src/receiver/receiver
+/src/processor/processor
 *.zip
 lambda.zip
 

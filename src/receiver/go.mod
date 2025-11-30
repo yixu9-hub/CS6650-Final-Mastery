@@ -1,4 +1,4 @@
-module example.com/ordersync
+module example.com/ordersystem
 
 go 1.23
 

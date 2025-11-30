@@ -1,6 +1,6 @@
 resource "aws_lb" "alb" {
   count = var.create_alb ? 1 : 0
-  name               = "ordersync-alb"
+  name               = "ordersystem-alb"
   internal           = false
   load_balancer_type = "application"
   subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]

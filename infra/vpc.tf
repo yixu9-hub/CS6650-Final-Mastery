@@ -2,12 +2,12 @@ data "aws_availability_zones" "available" {}
 
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
-  tags = { Name = "ordersync-vpc" }
+  tags = { Name = "ordersystem-vpc" }
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = "ordersync-igw" }
+  tags   = { Name = "ordersystem-igw" }
 }
 
 resource "aws_subnet" "public_a" {
@@ -47,7 +47,7 @@ resource "aws_eip" "nat" {
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public_a.id
-  tags = { Name = "ordersync-nat" }
+  tags = { Name = "ordersystem-nat" }
 }
 
 resource "aws_route_table" "public" {

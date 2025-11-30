@@ -1,4 +1,4 @@
-module example.com/ordersync/processor
+module example.com/ordersystem/processor
 
 go 1.23
 

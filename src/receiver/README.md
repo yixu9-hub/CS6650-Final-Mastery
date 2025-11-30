@@ -12,8 +12,8 @@ Run locally (PowerShell):
 go test -v
 
 # build and run server
-go build -o ordersync.exe
-.\ordersync.exe
+go build -o ordersystem.exe
+.\ordersystem.exe
 
 # or directly
 go run .

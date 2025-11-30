@@ -1,6 +1,6 @@
 // ECS Cluster
 resource "aws_ecs_cluster" "cluster" {
-  name = "ordersync-cluster"
+  name = "ordersystem-cluster"
 }
 
 // ECS Task Definitions (placeholders for container definitions)
@@ -20,6 +20,14 @@ resource "aws_ecs_task_definition" "order_receiver" {
       essential = true
       portMappings = [ { containerPort = 8080, hostPort = 8080, protocol = "tcp" } ]
       environment = [ { name = "SNS_TOPIC_ARN", value = aws_sns_topic.order_events.arn } ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/order-receiver"
+          "awslogs-region"        = "us-west-2"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
     }
   ])
 }
@@ -42,12 +50,22 @@ resource "aws_ecs_task_definition" "order_processor" {
         { name = "SQS_QUEUE_URL", value = aws_sqs_queue.order_queue.id },
         { name = "PROCESSOR_CONCURRENCY", value = tostring(var.processor_concurrency) }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/order-processor"
+          "awslogs-region"        = "us-west-2"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
     }
   ])
 }
 
 // ECS Services
 resource "aws_ecs_service" "order_receiver_svc" {
+  depends_on = [null_resource.build_and_push_images]
+
   name            = "order-receiver-svc"
   cluster         = aws_ecs_cluster.cluster.id
   task_definition = aws_ecs_task_definition.order_receiver.arn
@@ -68,9 +86,19 @@ resource "aws_ecs_service" "order_receiver_svc" {
       container_port   = 8080
     }
   }
+
+  triggers = {
+    redeployment = aws_ecs_task_definition.order_receiver.revision
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 resource "aws_ecs_service" "order_processor_svc" {
+  depends_on = [null_resource.build_and_push_images]
+
   name            = "order-processor-svc"
   cluster         = aws_ecs_cluster.cluster.id
   task_definition = aws_ecs_task_definition.order_processor.arn
@@ -81,5 +109,13 @@ resource "aws_ecs_service" "order_processor_svc" {
     subnets         = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     security_groups = [aws_security_group.ecs_sg.id]
     assign_public_ip = false
+  }
+
+  triggers = {
+    redeployment = aws_ecs_task_definition.order_processor.revision
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }

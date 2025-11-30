@@ -49,18 +49,35 @@ HW7/
 - Docker installed
 - Go 1.23+
 
-### Quick Start
+### Terraform Automated Deployment
+The infrastructure is configured to automatically:
+- Create ECR repositories
+- Build Docker images from source code
+- Push images to ECR with `:latest` tag
+- Deploy ECS services with automatic updates when code changes
+
+**Key Features:**
+- **Zero-touch deployment**: Single `terraform apply` command
+- **Automatic image updates**: Code changes trigger new builds
+- **Immutable deployments**: Uses `:latest` tag for rolling updates
+- **Dependency management**: Services wait for images before deployment
+
+**Triggers for rebuilds:**
+- Changes to `src/receiver/main.go` or `Dockerfile`
+- Changes to `src/processor/main.go` or `Dockerfile`
+
+### Manual Deployment (Alternative)
 ```bash
-# 1. Build and push Docker images
+# 1. Build and push Docker images manually
 cd src/receiver
-docker build -t ordersync-receiver:local .
+docker build -t ordersystem-receiver:local .
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 211125751164.dkr.ecr.us-west-2.amazonaws.com
-docker tag ordersync-receiver:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-api:latest
+docker tag ordersystem-receiver:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-api:latest
 docker push 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-api:latest
 
 cd ../processor
-docker build -t ordersync-processor:local .
-docker tag ordersync-processor:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-processor:latest
+docker build -t ordersystem-processor:local .
+docker tag ordersystem-processor:local 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-processor:latest
 docker push 211125751164.dkr.ecr.us-west-2.amazonaws.com/order-processor:latest
 
 # 2. Deploy infrastructure
@@ -128,7 +145,7 @@ aws logs tail /ecs/order-processor --follow --region us-west-2
 Update `PROCESSOR_CONCURRENCY` environment variable:
 ```bash
 aws ecs update-service \
-  --cluster ordersync-cluster \
+  --cluster ordersystem-cluster \
   --service order-processor-svc \
   --force-new-deployment \
   --region us-west-2

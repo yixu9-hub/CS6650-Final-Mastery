@@ -136,7 +136,11 @@ aws sqs get-queue-attributes \
 
 ### ECS Processor Logs
 ```bash
-aws logs tail /ecs/order-processor --follow --region us-west-2
+# From PowerShell (recommended)
+aws logs tail /ecs/order-processor --region us-west-2 --since 5m
+
+# Or specify the full log group name
+aws logs tail "/ecs/order-processor" --region us-west-2 --since 5m
 ```
 
 ## Configuration

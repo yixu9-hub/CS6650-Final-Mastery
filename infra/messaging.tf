@@ -6,7 +6,7 @@ resource "aws_sns_topic" "order_events" {
 resource "aws_sqs_queue" "order_queue" {
   name                          = "order-processing-queue"
   visibility_timeout_seconds    = 30
-  message_retention_seconds     = 345600 // 4 days
+  message_retention_seconds     = 3600 // 1 hour
   receive_wait_time_seconds     = 20     // long polling
 }
 

@@ -46,5 +46,5 @@ variable "ecs_task_role_arn" {
 variable "processor_concurrency" {
   description = "Number of concurrent workers the processor should run by default"
   type        = number
-  default     = 1
+  default     = 2
 }

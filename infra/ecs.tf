@@ -90,10 +90,6 @@ resource "aws_ecs_service" "order_receiver_svc" {
   triggers = {
     redeployment = aws_ecs_task_definition.order_receiver.revision
   }
-
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
 }
 
 resource "aws_ecs_service" "order_processor_svc" {
@@ -113,9 +109,5 @@ resource "aws_ecs_service" "order_processor_svc" {
 
   triggers = {
     redeployment = aws_ecs_task_definition.order_processor.revision
-  }
-
-  lifecycle {
-    ignore_changes = [task_definition]
   }
 }

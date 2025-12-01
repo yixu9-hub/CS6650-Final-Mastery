@@ -1,7 +1,8 @@
 // Security groups
 resource "aws_security_group" "ecs_sg" {
+  count  = var.create_vpc ? 1 : 0
   name   = "ecs-sg"
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main[0].id
 
   ingress {
     description = "Container port from ALB"
@@ -22,7 +23,7 @@ resource "aws_security_group" "ecs_sg" {
 resource "aws_security_group" "alb_sg" {
   count  = var.create_alb ? 1 : 0
   name   = "alb-sg"
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main[0].id
 
   ingress {
     description = "HTTP"

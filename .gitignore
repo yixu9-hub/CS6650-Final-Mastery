@@ -45,13 +45,21 @@ wheels/
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
-terraform.tfvars
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
 .terraformrc
 terraform.rc
+
+# Experiment results and metrics
+results/
+*.csv
+metrics/
+*.png
+
+# LocalStack data
+localstack-data/
 
 # Docker
 .dockerignore

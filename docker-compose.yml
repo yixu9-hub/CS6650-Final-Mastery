@@ -1,0 +1,35 @@
+services:
+  localstack:
+    image: localstack/localstack-pro:latest
+    container_name: localstack-main
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=sqs,sns,ecr,ecs,logs,iam,ec2,elbv2
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - PERSISTENCE=0
+      - EAGER_SERVICE_LOADING=1
+      - LOCALSTACK_AUTH_TOKEN=ls-wIkeloKU-HeCa-0749-nEHO-0896qoPu5677
+    volumes:
+      - "./localstack:/etc/localstack/init/ready.d"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "bash", "/etc/localstack/init/ready.d/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - localstack-network
+
+  # Note: receiver and processor services are deployed via Terraform to LocalStack ECS
+  # This ensures consistent architecture between LocalStack and AWS environments
+  # Services are accessible at:
+  #   - Receiver: http://localhost:8080 (via LocalStack ALB)
+  #   - Processor: runs as ECS task, consumes from SQS
+  # To view ECS services: aws ecs list-services --cluster ordersystem-cluster --endpoint-url http://localhost:4566
+
+networks:
+  localstack-network:
+    driver: bridge

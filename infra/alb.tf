@@ -3,7 +3,7 @@ resource "aws_lb" "alb" {
   name               = "ordersystem-alb"
   internal           = false
   load_balancer_type = "application"
-  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+  subnets            = [aws_subnet.public_a[0].id, aws_subnet.public_b[0].id]
   security_groups    = [aws_security_group.alb_sg[0].id]
 }
 
@@ -12,7 +12,7 @@ resource "aws_lb_target_group" "orders_api_tg" {
   name     = "orders-api-tg-v2"
   port     = 8080
   protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = aws_vpc.main[0].id
   target_type = "ip"
 
   health_check {

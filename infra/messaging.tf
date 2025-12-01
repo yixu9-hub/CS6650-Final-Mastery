@@ -1,13 +1,40 @@
 // Messaging: SNS topic + SQS queue
 resource "aws_sns_topic" "order_events" {
-  name = "order-processing-events"
+  name = "order-processing-events-${var.environment}"
+
+  tags = {
+    Environment = var.environment
+    Purpose     = "Order processing experiments"
+  }
+}
+
+// Dead Letter Queue for failed messages
+resource "aws_sqs_queue" "order_dlq" {
+  name                      = "order-processing-dlq-${var.environment}"
+  message_retention_seconds = 1209600 // 14 days
+
+  tags = {
+    Environment = var.environment
+    Purpose     = "Order processing DLQ"
+  }
 }
 
 resource "aws_sqs_queue" "order_queue" {
-  name                          = "order-processing-queue"
-  visibility_timeout_seconds    = 30
-  message_retention_seconds     = 3600 // 1 hour
-  receive_wait_time_seconds     = 20     // long polling
+  name                       = "order-processing-queue-${var.environment}"
+  visibility_timeout_seconds = var.visibility_timeout
+  message_retention_seconds  = var.message_retention_period
+  receive_wait_time_seconds  = var.receive_wait_time
+
+  // Configure Dead Letter Queue
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.order_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = {
+    Environment = var.environment
+    Purpose     = "Order processing experiments"
+  }
 }
 
 // Allow SNS topic to send messages to the SQS queue

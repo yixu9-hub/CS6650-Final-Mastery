@@ -1,14 +1,16 @@
-# CS6650 HW7 - Asynchronous Order Processing with AWS ECS
+# CS6650 Final Mastery - LocalStack vs AWS Performance Comparison
 
 ## Project Overview
-This project implements a scalable asynchronous order processing system using AWS ECS and SQS.
+This project implements a comparative study of LocalStack Pro and AWS for asynchronous order processing systems, measuring latency, throughput, and architectural differences.
 
 ## Architecture
 
-### ECS + SQS Architecture
-- **Order Receiver** (ECS Fargate): Handles `/orders/sync` and `/orders/async` endpoints
+### Unified ECS + SNS/SQS Architecture
+Both environments use identical architecture for fair comparison:
+- **Order Receiver** (ECS Fargate): Handles `/orders/async` endpoint
 - **Order Processor** (ECS Fargate): Polls SQS and processes orders with configurable concurrency
 - **Message Flow**: API → SNS → SQS → ECS Processor
+- **Monitoring**: CloudWatch Logs, Metrics collection to CSV
 
 ## Infrastructure Components
 - **VPC**: 10.0.0.0/16 with public (10.0.1.0/24, 10.0.2.0/24) and private subnets (10.0.10.0/24, 10.0.11.0/24)
@@ -16,57 +18,122 @@ This project implements a scalable asynchronous order processing system using AW
 - **ECR**: Docker image repositories for receiver and processor
 - **SNS/SQS**: Message queue infrastructure
 
-## Project Structure
-```
-HW7/
-├── infra/                 # Terraform infrastructure
-│   ├── main.tf           # Provider and locals
-│   ├── vpc.tf            # VPC, subnets, NAT gateway
-│   ├── alb.tf            # Application Load Balancer
-│   ├── ecs.tf            # ECS cluster, task definitions, services
-│   ├── ecr.tf            # Container registries
-│   ├── messaging.tf      # SNS and SQS
-│   ├── lambda.tf         # Lambda function (Part III)
-│   └── security_groups.tf # Security groups
-├── src/
-│   ├── receiver/          # Order receiver service
-│   │   ├── main.go       # Go HTTP server with sync/async endpoints
-│   │   ├── Dockerfile    # Container image
-│   │   ├── locust_sync.py    # Load test for sync endpoint
-│   │   └── locust_async.py   # Load test for async endpoint
-│   └── processor/         # ECS order processor
-│       ├── main.go       # SQS poller with goroutine workers
-│       └── Dockerfile    # Container image
-└── scripts/
-    └── deploy_images_and_update.ps1  # Docker build/push helper
-```
 
 ## Deployment
 
-### Prerequisites
-- AWS CLI configured
-- Terraform installed
-- Docker installed
-- Go 1.23+
+### LocalStack Pro Setup (Recommended for Development)
+For enhanced local development with full AWS service compatibility:
 
-### Terraform Automated Deployment
-The infrastructure is configured to automatically:
-- Create ECR repositories
-- Build Docker images from source code
-- Push images to ECR with `:latest` tag
-- Deploy ECS services with automatic updates when code changes
+1. **Get LocalStack Pro License** (Free for students):
+   - Visit: https://app.localstack.cloud/
+   - Sign up with your student email
+   - Get your API key from the dashboard
 
-**Key Features:**
-- **Zero-touch deployment**: Single `terraform apply` command
-- **Automatic image updates**: Code changes trigger new builds
-- **Immutable deployments**: Uses `:latest` tag for rolling updates
-- **Dependency management**: Services wait for images before deployment
+2. **Configure LocalStack Pro**:
+   ```bash
+   # Run the setup script
+   .\scripts\setup-localstack-pro.ps1
+   
+   # Or manually edit .env file
+   # Add your API key: LOCALSTACK_API_KEY=your_key_here
+   ```
 
-**Triggers for rebuilds:**
-- Changes to `src/receiver/main.go` or `Dockerfile`
-- Changes to `src/processor/main.go` or `Dockerfile`
+3. **Start LocalStack**:
+   ```bash
+   .\scripts\01-start-localstack.ps1
+   ```
 
-### Manual Deployment (Alternative)
+4. **Deploy Services**:
+   ```bash
+   .\scripts\deploy-localstack.ps1
+   ```
+
+## Prerequisites
+
+### Required Software
+- **Docker Desktop** (with WSL 2 enabled on Windows)
+- **Terraform** >= 1.3.0
+- **AWS CLI** configured with credentials
+- **Go** >= 1.23 (for local builds)
+- **Python** >= 3.8 (for Locust load testing and analysis)
+- **PowerShell** 7+ (recommended for Windows)
+
+### Required Credentials
+- **AWS Account**: For real AWS deployment
+  - Configure with `aws configure`
+  - Ensure IAM permissions for ECS, ECR, VPC, ALB, SNS, SQS
+- **LocalStack Pro License** (Free for students):
+  - Sign up at: https://app.localstack.cloud/
+  - Get your auth token from the dashboard
+  - Add to environment: `LOCALSTACK_AUTH_TOKEN=ls-xxx...`
+
+### Verify Installation
+```powershell
+docker --version
+terraform --version
+aws --version
+go version
+python --version
+locust --version  # pip install locust if missing
+```
+
+## Quick Start (Recommended)
+
+### Option 1: Interactive Menu
+```powershell
+.\quick-start.ps1
+```
+This launches an interactive menu to:
+- Setup and start LocalStack environment
+- Deploy to LocalStack (with ECS services)
+- Deploy to AWS (with confirmation)
+- Run experiments and load tests
+- Analyze results and generate visualizations
+
+### Option 2: Manual Step-by-Step
+
+#### Deploy LocalStack Environment
+```powershell
+# 1. Start LocalStack container
+.\scripts\01-start-localstack.ps1
+
+# 2. Deploy infrastructure and ECS services
+.\scripts\deploy-localstack.ps1
+
+# 3. Verify deployment
+curl http://localhost:8080/health
+# Expected: OK
+
+# 4. Test order processing
+$body = @{order_id="test-001"; customer_id=123; items=@(@{product_id="p1"; quantity=2; price=10.5})} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://localhost:8080/orders/async" -Method Post -Body $body -ContentType "application/json"
+```
+
+#### Deploy AWS Environment
+```powershell
+# 1. Build and push Docker images to ECR
+.\scripts\push-images-to-ecr.ps1
+
+# 2. Deploy infrastructure with Terraform
+cd infra
+terraform workspace select aws  # Create if doesn't exist
+terraform apply -var-file="aws.tfvars" -auto-approve
+
+# 3. Get ALB DNS name
+terraform output alb_dns_name
+# Output: ordersystem-alb-xxx.us-west-2.elb.amazonaws.com
+
+# 4. Test AWS deployment (wait ~2 minutes for tasks to start)
+curl http://ordersystem-alb-xxx.us-west-2.elb.amazonaws.com/health
+```
+
+### Automated Deployment Details
+**LocalStack**: Terraform creates ECS services that run as Docker containers via LocalStack
+**AWS**: Images must be in ECR before ECS services can start
+- Use `.\scripts\push-images-to-ecr.ps1` to build and push images
+- Terraform creates all infrastructure including ECS services
+
+### Manual Image Build (If Needed)
 ```bash
 # 1. Build and push Docker images manually
 cd src/receiver
@@ -89,100 +156,143 @@ terraform apply
 terraform output alb_dns_name
 ```
 
-## Testing
+## Testing & Experiments
 
-### Health Check
-```bash
-curl http://<ALB-DNS>/health
-# Expected: OK (200)
+### Quick Health Check
+```powershell
+# LocalStack
+curl http://localhost:8080/health
+
+# AWS
+curl http://ordersystem-alb-xxx.us-west-2.elb.amazonaws.com/health
 ```
 
-### Synchronous Order Processing
-```bash
-curl -X POST http://<ALB-DNS>/orders/sync \
-  -H "Content-Type: application/json" \
-  -d '{"order_id":"001","customer_id":123,"items":[{"product_id":"SKU-001","quantity":1,"price":19.99}]}'
-# Expected: 200 OK after ~3 seconds
-```
+### Send Test Orders
+```powershell
+# LocalStack
+$body = @{order_id="test-001"; customer_id=123; items=@(@{product_id="p1"; quantity=2; price=10.5})} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://localhost:8080/orders/async" -Method Post -Body $body -ContentType "application/json"
 
-### Asynchronous Order Processing
-```bash
-curl -X POST http://<ALB-DNS>/orders/async \
-  -H "Content-Type: application/json" \
-  -d '{"order_id":"002","customer_id":123,"items":[{"product_id":"SKU-001","quantity":1,"price":19.99}]}'
-# Expected: 202 Accepted immediately
+# AWS
+$body = @{order_id="test-002"; customer_id=456; items=@(@{product_id="p2"; quantity=1; price=25.99})} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://ordersystem-alb-xxx.us-west-2.elb.amazonaws.com/orders/async" -Method Post -Body $body -ContentType "application/json"
 ```
 
 ### Load Testing with Locust
-```bash
-cd src/receiver
+```powershell
+# LocalStack load test
+locust -f locustfile/locust_async.py --host=http://localhost:8080
 
-# Test sync endpoint
-locust -f locust_sync.py --host http://<ALB-DNS> --headless --users 20 --spawn-rate 1 --run-time 60s
+# AWS load test
+locust -f locustfile/locust_async.py --host=http://ordersystem-alb-xxx.us-west-2.elb.amazonaws.com
 
-# Test async endpoint
-locust -f locust_async.py --host http://<ALB-DNS> --headless --users 30 --spawn-rate 10 --run-time 60s
+# Access Locust web UI at: http://localhost:8089
+# Recommended test: 100 users, spawn rate 10
 ```
 
-## Monitoring
+### Run Automated Experiments
+```powershell
+# Run latency experiments
+.\scripts\04-run-experiments.ps1 -Experiment latency
 
-### SQS Queue Depth
-```bash
-aws sqs get-queue-attributes \
-  --queue-url https://sqs.us-west-2.amazonaws.com/211125751164/order-processing-queue \
-  --attribute-names ApproximateNumberOfMessages \
-  --region us-west-2
+# Run all experiments
+.\scripts\04-run-experiments.ps1 -Experiment all -Environment both
 ```
 
-### ECS Processor Logs
-```bash
-# From PowerShell (recommended)
-aws logs tail /ecs/order-processor --region us-west-2 --since 5m
+### View Metrics and Logs
+```powershell
+# View processor metrics (CSV files)
+cat results/localstack/metrics_*.csv
+cat results/aws/metrics_*.csv
 
-# Or specify the full log group name
-aws logs tail "/ecs/order-processor" --region us-west-2 --since 5m
+# View ECS container logs (LocalStack)
+docker ps  # Find container names starting with ls-ecs-
+docker logs -f <container-name>
+
+# View ECS logs (AWS)
+aws logs tail /ecs/order-processor --region us-west-2 --since 5m --follow
+aws logs tail /ecs/order-receiver --region us-west-2 --since 5m --follow
+```
+
+## Monitoring & Debugging
+
+### Check ECS Services Status
+```powershell
+# LocalStack ECS services
+.\scripts\check-ecs-status.ps1 -Environment localstack
+
+# AWS ECS services
+.\scripts\check-ecs-status.ps1 -Environment aws
+# Or: aws ecs describe-services --cluster ordersystem-cluster --services order-receiver-svc order-processor-svc --region us-west-2
+```
+
+### Monitor Queue Depth
+```powershell
+# LocalStack
+aws sqs get-queue-attributes --queue-url http://sqs.us-west-2.localhost.localstack.cloud:4566/000000000000/order-processing-queue-localstack --attribute-names ApproximateNumberOfMessages --endpoint-url http://localhost:4566 --region us-west-2
+
+# AWS
+aws sqs get-queue-attributes --queue-url https://sqs.us-west-2.amazonaws.com/211125751164/order-processing-queue-aws --attribute-names ApproximateNumberOfMessages --region us-west-2
+```
+
+### View Container/Task Logs
+```powershell
+# LocalStack (Docker containers)
+docker ps --filter "name=ls-ecs-ordersystem"
+docker logs -f <container-name>
+
+# AWS (CloudWatch Logs)
+aws logs tail /ecs/order-processor --region us-west-2 --since 10m --follow
 ```
 
 ## Configuration
 
-### Scaling Processor Concurrency (Part II)
-Update `PROCESSOR_CONCURRENCY` environment variable:
-```bash
-aws ecs update-service \
-  --cluster ordersystem-cluster \
-  --service order-processor-svc \
-  --force-new-deployment \
-  --region us-west-2
-```
-
-Or modify `infra/variables.tf`:
+### Scaling Processor Concurrency
+Modify `infra/localstack.tfvars` or `infra/aws.tfvars`:
 ```hcl
-variable "processor_concurrency" {
-  default = 100  # Adjust based on load testing
-}
+processor_concurrency = 10  # Number of concurrent goroutines per processor
 ```
 
-## Performance Analysis
+Then redeploy:
+```powershell
+cd infra
+terraform apply -var-file="localstack.tfvars" -auto-approve  # For LocalStack
+terraform apply -var-file="aws.tfvars" -auto-approve         # For AWS
+```
 
-### Processing Capacity
-- **1 worker**: 0.33 orders/sec (1 order per 3s)
-- **20 workers**: 6.67 orders/sec
-- **100 workers**: 33.3 orders/sec
-
-### Cost Estimate (10,000 orders/month)
-- **ECS**: ~$17/month (2 tasks always running)
-
-## Key Learnings
-1. **Sync vs Async**: Async architecture accepts orders 100x faster but requires queue management
-2. **Queue Management**: Monitor `ApproximateNumberOfMessagesVisible` to prevent backlog
-3. **Worker Scaling**: Match processing capacity to ingestion rate (need ~60 workers for 60 orders/sec at 3s processing time)
-4. **Concurrency Tuning**: Adjust `PROCESSOR_CONCURRENCY` environment variable to scale processing capacity
+### Adjust Payment Simulation Time
+```hcl
+payment_sim_seconds = 3  # Seconds to simulate payment processing
+```
 
 ## Cleanup
-```bash
-cd infra
-terraform destroy -auto-approve
+
+### Cleanup LocalStack
+```powershell
+.\scripts\05-cleanup.ps1 -Environment localstack
 ```
+This will:
+1. Destroy Terraform infrastructure
+2. Stop and remove LocalStack container
+
+### Cleanup AWS
+```powershell
+.\scripts\05-cleanup.ps1 -Environment aws
+```
+**Warning**: This will destroy all AWS resources (VPC, ECS, ALB, etc.)
+
+### Cleanup Both Environments
+```powershell
+.\scripts\05-cleanup.ps1 -Environment both
+```
+
+## References
+- [LocalStack Documentation](https://docs.localstack.cloud/)
+- [AWS ECS Best Practices](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 
 ## License
 Educational project for CS6650 - Building Scalable Distributed Systems
+
+## Contributors
+- Yi Xu (@yixu9-hub)

@@ -19,7 +19,9 @@ class AsyncUser(HttpUser):
     @task
     def post_async_order(self):
         order = make_order()
-        # /orders/async should return quickly with 202
+        # /orders/async should return quickly with 200 or 202
         with self.client.post("/orders/async", json=order, timeout=5, catch_response=True) as resp:
-            if resp.status_code != 202:
+            if resp.status_code not in [200, 202]:
                 resp.failure(f"unexpected status {resp.status_code}")
+            else:
+                resp.success()

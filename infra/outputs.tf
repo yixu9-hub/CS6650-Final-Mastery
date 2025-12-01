@@ -8,8 +8,23 @@ output "sqs_queue_url" {
   value       = aws_sqs_queue.order_queue.id
 }
 
+output "sqs_queue_arn" {
+  description = "SQS queue ARN"
+  value       = aws_sqs_queue.order_queue.arn
+}
+
+output "sqs_dlq_url" {
+  description = "Dead Letter Queue URL"
+  value       = aws_sqs_queue.order_dlq.id
+}
+
+output "sqs_dlq_arn" {
+  description = "Dead Letter Queue ARN"
+  value       = aws_sqs_queue.order_dlq.arn
+}
+
 output "ecs_cluster_name" {
-  value = aws_ecs_cluster.cluster.name
+  value = var.create_ecs ? aws_ecs_cluster.cluster[0].name : "N/A"
 }
 
 output "alb_dns_name" {
@@ -19,10 +34,10 @@ output "alb_dns_name" {
 
 output "order_api_repo_url" {
   description = "ECR repository URL for the order API"
-  value       = aws_ecr_repository.order_api.repository_url
+  value       = var.create_ecr ? aws_ecr_repository.order_api[0].repository_url : "N/A"
 }
 
 output "order_processor_repo_url" {
   description = "ECR repository URL for the order processor"
-  value       = aws_ecr_repository.order_processor.repository_url
+  value       = var.create_ecr ? aws_ecr_repository.order_processor[0].repository_url : "N/A"
 }
